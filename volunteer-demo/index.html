@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#4b392b"><link rel="icon" href="data:,"><title>도서관에서 살아남기 · 첫 봉사</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="game-header"><div class="title"><span class="title-icon">▥</span><div><strong>도서관에서 살아남기</strong><small>첫 봉사 · 인트로 샘플</small></div></div><div id="main-hud" class="status-hud"></div></header>
+<main>
+ <canvas id="scene" tabindex="0" aria-label="도서관 필드. 방향키 또는 WASD로 이동, E로 상호작용"></canvas><div id="labels"></div><div id="quest"><small id="quest-step">첫 봉사 전</small><strong id="objective"></strong></div>
+ <div class="camera-controls"><button id="overview">전체 보기</button><button id="follow">따라가기</button><button id="inspect-open">샘플 검수</button></div>
+ <button id="prompt" hidden></button><div id="toast" role="status"></div>
+ <div id="inventory"><span id="inventory-text">손 0권 · 북카트 0권</span><button id="book-list">책 확인</button><button id="cart-toggle">북카트 연결 · C</button></div>
+ <div id="controls"><div id="joystick" aria-label="이동 조이스틱"><div id="knob"></div></div><button id="interact">확인 · E</button></div>
+ <div id="help">WASD / 방향키 · 바닥 클릭 이동 · E 상호작용 · C 북카트 · 휠 확대</div>
+ <button id="preview-exit" hidden>검수 끝내기</button>
+</main>
+<dialog id="dialogue" aria-labelledby="speaker"><div id="dialogue-hud" class="dialog-hud"></div><div class="portrait left"><div id="hero-art" class="portrait-art"></div></div><div class="portrait right"><div id="npc-art" class="portrait-art"></div></div><div id="choices" class="choice-books"></div><section class="speech"><div class="speech-top"><strong id="speaker"></strong><button id="close-dialog">잠깐 둘러보기</button></div><p id="line"></p><button id="next" class="primary">계속</button></section></dialog>
+<dialog id="sorting" aria-labelledby="sort-title"><div class="panel-heading"><div><small>책 꽂는 법 배우기</small><h2 id="sort-title"></h2></div><button id="close-sort" aria-label="필드로 돌아가기">×</button></div><p id="sort-hint"></p><p class="sort-instruction">아래 책을 끌어 원하는 틈에 놓아주세요. 틈을 눌러 골라도 됩니다.</p><div id="sorting-shelf"></div><div id="sorting-source"></div><p id="sort-feedback" role="status"></p><div class="panel-actions"><span id="sort-progress"></span><button id="sort-confirm" class="primary" disabled>이 자리에 꽂기</button></div></dialog>
+<dialog id="inspection" aria-labelledby="inspect-title"><div class="panel-heading"><h2 id="inspect-title">샘플 장면 검수</h2><button id="close-inspect">×</button></div><p>장면을 바로 확인할 수 있어요. 검수를 끝내면 원래 진행으로 돌아갑니다.</p><div id="inspect-buttons"></div></dialog>
+<div id="loading"><div>▥</div><h1>첫 봉사 날의 도서관</h1><p id="loading-message">도서관 문을 여는 중…</p></div>
+<script type="module" src="game.js"></script>
+</body></html>
