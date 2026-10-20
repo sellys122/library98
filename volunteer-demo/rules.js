@@ -19,10 +19,10 @@ export function compareCallNumbers(a,b){
 export function insertionSlot(books,target){return books.filter(b=>compareCallNumbers(b,target)<0).length}
 export function labelParts(code){const p=splitCallNumber(code);return [p.classificationText,p.author+p.number+p.suffix]}
 export const SORT_LESSONS=[
- {title:'1 / 4 · 첫 숫자',hint:'맨 앞의 분류번호를 숫자순으로 비교해요. 소수점 뒤까지 확인하세요.',books:['206.5가12ㄴ','206.7가12ㄴ','206.8가12ㄴ','207가12ㄴ','208.15가12ㄴ'],target:'206.85가12ㄴ'},
- {title:'2 / 4 · 첫 문자',hint:'분류번호가 같으면 그 뒤의 문자를 가나다순으로 비교해요.',books:['808.3가12ㄴ','808.3나12ㄴ','808.3다12ㄴ','808.3마12ㄴ','808.3바12ㄴ'],target:'808.3라12ㄴ'},
- {title:'3 / 4 · 문자 뒤 숫자',hint:'문자 뒤 숫자는 소수의 자릿수처럼 왼쪽부터 비교해요. 808.3가125ㄴ은 808.3가55ㄴ보다 앞에 와요.',books:['808.3가12ㄴ','808.3가125ㄴ','808.3가3ㄴ','808.3가6ㄴ','808.3가7ㄴ'],target:'808.3가55ㄴ'},
- {title:'4 / 4 · 마지막 문자',hint:'앞부분이 모두 같으면 마지막 문자를 가나다순으로 비교해요.',books:['808.3가55ㄱ','808.3가55ㄴ','808.3가55ㄷ','808.3가55ㅁ','808.3가55ㅂ'],target:'808.3가55ㄹ'},
+ {title:'1 / 4 · 맨 앞 숫자',hint:'이번에는 맨 앞의 숫자만 볼게요. 작은 번호가 왼쪽에 오도록 꽂으면 돼요. 206.85는 어느 위치에 들어갈까요?',retry:p=>`다시 한번 해볼까요? 우선 숫자끼리 비교해야 해요. ${p.classificationText}는 어느 위치에 들어갈까요?`,books:['206.5가12ㄴ','206.7가12ㄴ','206.8가12ㄴ','207가12ㄴ','208.15가12ㄴ'],target:'206.85가12ㄴ'},
+ {title:'2 / 4 · 그다음 글자',hint:'맨 앞의 808.3은 모두 같네요. 이제 그다음 글자를 보고 가나다순으로 꽂으면 돼요. 「라」는 어느 글자 사이에 들어갈까요?',retry:p=>`다시 한번 해볼까요? 맨 앞의 ${p.classificationText}는 모두 같으니 그다음 글자를 보면 돼요. 가, 나, 다 순서로 생각해 보세요. 「${p.author}」는 어느 글자 사이에 들어갈까요?`,books:['808.3가12ㄴ','808.3나12ㄴ','808.3다12ㄴ','808.3마12ㄴ','808.3바12ㄴ'],target:'808.3라12ㄴ'},
+ {title:'3 / 4 · 문자 뒤 숫자',hint:'808.3가까지는 모두 같네요. 그 뒤의 숫자끼리 비교해 볼까요? 첫 번째 숫자끼리 보고 책을 꽂으면 돼요. 5는 어느 위치에 들어갈까요?',retry:p=>`다시 한번 해볼까요? ${p.classificationText+p.author}까지는 모두 같네요. 그 뒤의 숫자끼리 비교해 볼까요? 첫 번째 숫자끼리 보고 책을 꽂으면 돼요. ${p.number[0]}는 어느 위치에 들어갈까요?`,books:['808.3가12ㄴ','808.3가125ㄴ','808.3가3ㄴ','808.3가6ㄴ','808.3가7ㄴ'],target:'808.3가55ㄴ'},
+ {title:'4 / 4 · 맨 끝 글자',hint:'808.3가55까지는 모두 같네요. 맨 끝 글자만 보고 ㄱ, ㄴ, ㄷ 순서로 꽂으면 돼요. 「ㄹ」은 어느 글자 사이에 들어갈까요?',retry:p=>`다시 한번 해볼까요? ${p.classificationText+p.author+p.number}까지는 모두 같으니 맨 끝 글자만 보면 돼요. ㄱ, ㄴ, ㄷ 다음에 오는 「${p.suffix}」은 어느 위치에 들어갈까요?`,books:['808.3가55ㄱ','808.3가55ㄴ','808.3가55ㄷ','808.3가55ㅁ','808.3가55ㅂ'],target:'808.3가55ㄹ'},
 ];
 export function workClock(elapsed){const minutes=9*60+Math.min(SHIFT_SECONDS,Math.max(0,elapsed))/SHIFT_SECONDS*240;return {minutes,text:String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(Math.floor(minutes%60)).padStart(2,'0')}}
 export function newRecord(){return {day:1,elapsed:0,mistakes:0,previousMistakes:0,counted:[],failed:false,served:0,shelved:0,totalServed:0,totalShelved:0,hp:5}}

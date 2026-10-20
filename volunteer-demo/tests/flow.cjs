@@ -30,7 +30,7 @@ class Element{
 function parseHTML(html,parent,doc){const stack=[parent];for(const token of html.match(/<!--[\s\S]*?-->|<[^>]+>|[^<]+/g)||[]){if(token.startsWith('<!--')||token.startsWith('<!'))continue;if(token.startsWith('</')){if(stack.length>1)stack.pop();continue}if(token.startsWith('<')){const m=token.match(/^<([\w-]+)/);if(!m)continue;const el=new Element(m[1],doc);for(const a of token.matchAll(/([\w-]+)(?:="([^"]*)")?/g)){if(a.index<=m[1].length)continue;el.setAttribute(a[1],a[2]||'')}stack.at(-1).append(el);if(!/\/$/.test(token.slice(0,-1))&&!['meta','link','br','img','input','hr'].includes(m[1]))stack.push(el)}else{stack.at(-1)._text+=token}}}
 
 (async()=>{
- const rules=await import(root+'/rules.js'),story=await import(root+'/story.js');
+ const rules=await import(root+'/rules.js'),story=await import(root+'/story.js'),navigation=await import(root+'/navigation.js');
  assert(rules.compareCallNumbers('808.3가125ㄴ','808.3가55ㄴ')<0);
  assert(rules.compareCallNumbers('808.3가9ㄴ','808.3가125ㄴ')>0);
  assert(rules.compareCallNumbers('808.3가125ㄴ','808.3가1250ㄴ')===0);
@@ -48,19 +48,21 @@ function parseHTML(html,parent,doc){const stack=[parent];for(const token of html
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(root+'/navigation.js','utf8').replace(/export /g,'')+'\n'+fs.readFileSync(root+'/game.js','utf8').replace(/^import .*?;\n/gm,''),ctx);await new Promise(r=>setImmediate(r));
  const api=ctx.window.library98Demo,$=id=>doc.getElementById(id);assert(api,$('loading-message')?.textContent);
  const clickNext=()=>{assert(!$('next').hidden);$('next').onclick()},clickChoice=text=>{const button=$('choices').children.find(c=>c.textContent.includes(text));assert(button,'choice missing: '+text+'; '+$('choices').textContent);button.onclick()};
- assert($('line').textContent.includes('완전 내 적성'));
+ assert.equal($('line').textContent,story.INTRO[0].text);
  for(let i=0;i<story.INTRO.length;i++)clickNext();assert.equal(api.state.phase,'sort');assert($('sorting').open);
  api.selectSlot(0);api.confirmSort();assert.equal(api.state.lesson,0);assert.equal(api.state.record.mistakes,0);
  for(const lesson of rules.SORT_LESSONS){api.selectSlot(rules.insertionSlot(lesson.books,lesson.target));assert(api.confirmSort())}
  assert.equal(api.state.phase,'collect');for(let i=0;i<story.AFTER_SORT.length;i++)clickNext();assert(!$('dialogue').open);
- api.teleport(.9,4.1);api.draw();assert.equal(api.nearby.type,'pile');api.interact();assert.equal(api.state.hand.length,3);assert.equal(api.state.phase,'load');
+ const collectState=api.snapshot();api.state.pile=Array.from({length:7},(_,i)=>({...rules.WORK_BOOKS[0],id:'pick-'+i,title:'선택 책 '+i}));api.interact({type:'pile'});assert($('pickup').open);assert.equal(api.state.hand.length,0,'opening the picker must not collect books');const pick=$('pickup-books').children;for(let i=0;i<5;i++)pick[i].onclick();assert(pick[5].disabled);pick[0].onclick();pick[5].onclick();$('pickup-confirm').onclick();assert.equal(api.state.hand.length,5);assert.equal(api.state.pile.length,2);assert(!api.state.hand.some(b=>b.id==='pick-0'));assert(api.state.hand.some(b=>b.id==='pick-5'));api.restore(collectState);
+ api.interact({type:'pile'});$('pickup-books').children[0].onclick();$('close-pickup').onclick();assert.equal(api.state.hand.length,0,'cancel must preserve the pile');assert.equal(api.state.pile.length,3);
+ api.teleport(.9,4.1);api.draw();assert.equal(api.nearby.type,'pile');api.interact();assert($('pickup').open);for(const button of $('pickup-books').children)button.onclick();$('pickup-confirm').onclick();assert.equal(api.state.hand.length,3);assert.equal(api.state.phase,'load');
  api.draw();assert.equal(api.nearby.type,'cart');api.interact();clickChoice('담는다');assert.equal(api.state.cart.books.length,3);assert.equal(api.state.phase,'cart');
- api.toggleCart();assert(api.state.cart.attached);const start=api.player.z,cstart=api.state.cart.z;assert(api.movePlayer(0,-.1)>.09);assert(api.player.z<start);assert.equal(api.state.cart.z-cstart,api.player.z-start);
- api.goTo(1.2,1.8);for(let i=0;i<240;i++)api.advance(.05);assert.equal(api.state.phase,'shelve','cart must actually arrive at the shelf');
+ api.toggleCart();assert(api.state.cart.attached);assert(Math.abs(Math.hypot(api.player.x-api.state.cart.x,api.player.z-api.state.cart.z)-.92)<.001,'the librarian must stand at the cart handle');const start=api.player.z,cstart=api.state.cart.z;assert(api.movePlayer(0,-.1)>.09);assert(api.player.z<start);assert(Math.abs((api.state.cart.z-cstart)-(api.player.z-start))<.000001);
+ const literature=layout.shelves.find(s=>s.category===8),history=layout.shelves.find(s=>s.category===9);api.goTo(literature.cartDock.x-api.state.cart.offset.x,literature.cartDock.z-api.state.cart.offset.z);for(let i=0;i<400;i++)api.advance(.05);assert.equal(api.state.phase,'shelve','cart must actually arrive at the shelf');
  api.draw();api.interact({type:'cart',obj:api.state.cart});clickChoice('책을 꺼낸다');assert(!api.state.cart.attached);assert.equal(api.state.hand.length,3);
- api.goTo(3.1,1);for(let i=0;i<240;i++)api.advance(.05);assert(Math.hypot(api.player.x-3.1,api.player.z-1)<.5,'shelf approach after cart detached');api.interact({type:'shelf',obj:layout.shelves.find(s=>s.category===8)});clickChoice('제자리에');assert.equal(api.state.phase,'service');
+ api.goTo(literature.approach.x,literature.approach.z);for(let i=0;i<300;i++)api.advance(.05);assert(Math.hypot(api.player.x-literature.approach.x,api.player.z-literature.approach.z)<.6,'shelf approach after cart detached');api.interact({type:'shelf',obj:literature});clickChoice('제자리에');assert.equal(api.state.phase,'service');
  for(let i=0;i<story.AFTER_CART.length;i++)clickNext();clickChoice('안내해드릴게요');assert.equal(api.state.phase,'escort');assert.equal(api.state.guide,'boy');
- api.closeAll();api.goTo(6.2,1);for(let i=0;i<400;i++)api.advance(.05);api.draw();assert.equal(api.nearby.type,'shelf','following patron must not hide the shelf interaction');api.interact();clickChoice('안내한다');assert.equal(api.state.phase,'report');
+ api.closeAll();api.goTo(history.approach.x,history.approach.z);for(let i=0;i<650;i++)api.advance(.05);api.draw();assert.equal(api.nearby.type,'shelf','following patron must not hide the shelf interaction');assert.equal(api.nearby.obj.code,'900');api.interact();clickChoice('안내한다');assert.equal(api.state.phase,'report');
  for(let i=0;i<story.BEFORE_CALL.length+1;i++)clickNext();api.interact({type:'npc',obj:api.actors.find(a=>a.id==='patron')});clickChoice('담당 선생님');assert.equal(api.state.phase,'call');
  api.interact({type:'npc',obj:api.actors.find(a=>a.id==='officer')});clickChoice('오류');assert.equal(api.state.phase,'helping');assert.equal(api.state.jobs.length,1);
  const officer=api.actors.find(a=>a.id==='officer'),mentor=api.actors.find(a=>a.id==='mentor');let workingStart=null,resolvedAt=null;
@@ -70,5 +72,9 @@ function parseHTML(html,parent,doc){const stack=[parent];for(const token of html
  for(let i=0;i<900;i++)api.advance(.05);assert(Math.abs(api.state.record.elapsed-45)<.001);assert.equal(rules.workClock(api.state.record.elapsed+.0001).text,'10:00');
  api.inspectScene('warning');api.closeAll();const n=api.actors.find(a=>a.id==='patron');api.interact({type:'npc',obj:n});clickChoice('직접 기기');assert(api.state.record.failed);assert.equal(api.state.record.mistakes,2);assert.equal(api.state.phase,'failed');
  api.exitPreview();assert.equal(api.state.phase,'work');assert.equal(api.state.record.mistakes,0);assert(Math.abs(api.state.record.elapsed-45)<.001);api.closeAll();for(let i=0;i<2701;i++)api.advance(.05);assert.equal(api.state.phase,'review');assert.equal(api.state.record.elapsed,180);clickChoice('다음 날');assert.equal(api.state.record.day,2);assert.equal(api.state.record.elapsed,0);
- assert(storage.size);console.log('PASS: full intro → 4 sorting rounds → load/move/unload cart → escort → officer visit/resolve/return → work; 180-second shift, two-day warnings, duplicate protection, preview restore, day rollover.');
+ assert(storage.size);
+ const restoreWork=api.snapshot();api.inspectScene('cart');api.closeAll();api.state.phase='service';api.teleport(api.state.cart.x-.92,api.state.cart.z);api.toggleCart();assert(api.state.cart.attached);const cartRouteState=api.snapshot();
+ for(const shelf of layout.shelves){api.restore(cartRouteState);const offset=api.state.cart.offset;api.goTo(shelf.cartDock.x-offset.x,shelf.cartDock.z-offset.z);for(let i=0;i<1000;i++)api.advance(.05);assert(Math.hypot(api.state.cart.x-shelf.cartDock.x,api.state.cart.z-shelf.cartDock.z)<.65,'cart route must reach shelf '+shelf.code);assert(!navigation.blocked(api.player.x,api.player.z,layout.colliders,.23));assert(!navigation.blocked(api.state.cart.x,api.state.cart.z,layout.colliders,.64))}
+ const legacy=api.snapshot();delete legacy.layoutRevision;legacy.player.x=0;legacy.player.z=2;api.restore(legacy);assert.equal(api.player.x,layout.spawn.x);assert.equal(api.player.z,layout.spawn.z);assert(!api.state.cart.attached);const resetMentor=api.actors.find(a=>a.id==='mentor');assert.equal(resetMentor.x,layout.mentor.x);assert.equal(resetMentor.z,layout.mentor.z);
+ api.restore(restoreWork);console.log('PASS: full tutorial, 5-book selection and cancel, cart handle spacing, all 10 cart routes, old-save migration, officer visit/resolve/return, 180-second shift, two-day warnings, duplicate protection, preview restore, day rollover.');
 })();
