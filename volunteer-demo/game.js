@@ -1,10 +1,10 @@
-import {Renderer,pose,assetFetch} from './engine.js';
-import {blocked,pathfind} from './navigation.js';
+import {Renderer,pose,assetFetch} from './engine.js?v=20261021-books';
+import {blocked,pathfind} from './navigation.js?v=20261021-books';
 import {SHIFT_SECONDS,CATEGORIES,SORT_LESSONS,WORK_BOOKS,splitCallNumber,labelParts,insertionSlot,workClock,newRecord,recordMistake,nextRecordDay} from './rules.js';
 import {INTRO,AFTER_SORT,AFTER_CART,BEFORE_CALL,OUTRO,CAREER_ARC} from './story.js';
 
 const $=id=>document.getElementById(id),canvas=$('scene'),keys=new Set(),SAVE_KEY='library98-volunteer-demo-v1',HAND_LIMIT=5,CART_RADIUS=.64,PUSH_DISTANCE=.92;
-let renderer,assets,layout,player,actors,state,path=[],nearby,last=0,time=0,toastUntil=0,saveAt=0,angle=.27,zoom=8.5,view='follow',stick={x:0,z:0},drag=null,previewBackup=null,session=false,stepAfterDialog=null,cartContentsKey='';
+let renderer,assets,layout,player,actors,state,path=[],nearby,pendingInteraction=null,last=0,time=0,toastUntil=0,saveAt=0,angle=.27,zoom=8.5,view='follow',stick={x:0,z:0},drag=null,previewBackup=null,session=false,stepAfterDialog=null,cartContentsKey='';
 const clone=o=>JSON.parse(JSON.stringify(o)),dist=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z),byId=id=>actors.find(a=>a.id===id);
 const hasModal=()=>!!document.querySelector('dialog[open]');
 const OBJECTIVES={intro:['첫 봉사 전','계약직 선생님과 인사하고 책 꽂는 법을 배워보세요'],sort:['1 · 책 꽂는 법','청구기호를 비교해 책을 맞는 사이에 꽂아주세요'],collect:['2 · 북카트 사용','북카트 옆의 책을 집어주세요'],load:['2 · 북카트 사용','북카트에 가까이 가서 책을 담아주세요'],cart:['2 · 북카트 사용','북카트를 연결하고 800 문학 서가 앞으로 옮겨주세요'],shelve:['2 · 북카트 사용','카트에서 책을 꺼내 800 문학 서가에 꽂아주세요'],service:['3 · 이용자 응대','이용자의 말을 듣고 응대해 보세요'],escort:['3 · 이용자 응대','이용자를 900 역사 서가까지 안내해 주세요'],report:['4 · 담당자에게 연결','기기 앞 이용자의 말을 듣고 담당 선생님께 연결해 주세요'],call:['4 · 담당자에게 연결','데스크 옆 주무관 선생님께 도움을 요청해 주세요'],helping:['4 · 담당자에게 연결','담당 선생님이 문제를 확인하고 있어요'],outro:['첫 봉사 준비 완료','계약직 선생님과 이야기를 마무리해 보세요'],ready:['첫 봉사 준비 완료','1일차 봉사를 시작해 보세요'],work:['오늘의 봉사','책을 모두 꽂고 이용자를 응대해 주세요'],review:['봉사 마무리','오늘의 활동을 확인해 주세요'],failed:['봉사활동 종료','봉사 참여가 종료되었습니다'],complete:['인트로 샘플 완료','다음 이야기는 주말계약직으로 이어집니다']};
@@ -24,7 +24,7 @@ function updateHUD(){
  if(state.phase==='work')$('objective').textContent='남은 책 '+remainingBooks()+'권 · 응대 '+r.served+'회'+(r.previousMistakes>=2?' · 어제 경고 2회, 오늘 응대에 유의해 주세요':'');
  $('inventory-text').textContent='손 '+state.hand.length+'권 · 북카트 '+state.cart.books.length+'권';$('cart-toggle').textContent=state.cart.attached?'북카트 분리 · C':'북카트 연결 · C';$('cart-toggle').classList.toggle('connected',state.cart.attached);
 }
-function clearInputs(){keys.clear();stick={x:0,z:0};path=[];$('knob').style.transform='translate(0,0)'}
+function clearInputs(){keys.clear();stick={x:0,z:0};path=[];pendingInteraction=null;$('knob').style.transform='translate(0,0)'}
 function say(text){$('toast').textContent=text;$('toast').classList.add('show');toastUntil=time+4}
 function closeAll(){for(const d of document.querySelectorAll('dialog[open]'))d.close();clearInputs()}
 function closeDialogue(){if($('dialogue').open)$('dialogue').close();clearInputs();canvas.focus({preventScroll:true})}
@@ -50,7 +50,7 @@ function restore(data){state=clone(data.state);player=clone(data.player);actors=
 
 function freshWorld(){
  player={...layout.spawn,angle:0,walk:0,moving:false};state={phase:'intro',lesson:0,slot:null,record:newRecord(),hand:[],pile:clone(WORK_BOOKS),cart:{...layout.cart,books:[],attached:false,offset:null,angle:0},guide:null,jobs:[],nextEvent:1};
- actors=[{id:'mentor',name:'계약직 선생님',appearance:'mentor',...layout.mentor,home:{...layout.mentor},status:'idle',angle:0,walk:0,route:[]},{id:'officer',name:'주무관 선생님',appearance:'officer',...layout.officer,home:{...layout.officer},status:'idle',angle:0,walk:0,route:[]},{id:'boy',name:'지호 · 이용자',appearance:'boy-blue',x:1.5,z:2.0,angle:0,walk:0,height:1.08,status:'hidden',category:9,request:'guide',eventId:'training-guide',route:[]},{id:'patron',name:'이용자',appearance:'patron',x:5.6,z:3.4,angle:-.7,walk:0,height:1.5,status:'hidden',request:'repair',eventId:'training-repair',route:[]}];
+ actors=[{id:'mentor',name:'계약직 선생님',appearance:'mentor',...layout.mentor,home:{...layout.mentor},status:'idle',angle:layout.mentor.angle||0,walk:0,route:[]},{id:'officer',name:'주무관 선생님',appearance:'officer',...layout.officer,home:{...layout.officer},status:'idle',angle:layout.officer.angle||0,walk:0,route:[]},{id:'boy',name:'지호 · 이용자',appearance:'boy-blue',x:1.5,z:2.0,angle:0,walk:0,height:1.08,status:'hidden',category:9,request:'guide',eventId:'training-guide',route:[]},{id:'patron',name:'이용자',appearance:'patron',x:5.6,z:3.4,angle:-.7,walk:0,height:1.5,status:'hidden',request:'repair',eventId:'training-repair',route:[]}];
  path=[];nearby=null;clearInputs();
 }
 function startIntro(){closeAll();freshWorld();session=true;phase('intro');sequence(INTRO,()=>{phase('sort');openSorting()})}
@@ -64,7 +64,15 @@ function continueScene(){
  else if(state.phase==='complete')showComplete();
 }
 
-function bookLabel(code,cls='sort-book'){const el=document.createElement('div');el.className=cls;const [a,b]=labelParts(code);const top=document.createElement('span');top.textContent=a;const bottom=document.createElement('small');bottom.textContent=b;el.append(top,bottom);return el}
+function bookLabel(code,cls='sort-book'){
+ const el=document.createElement('div');el.className=cls;const p=splitCallNumber(code),top=document.createElement('span'),bottom=document.createElement('small');
+ const focus=cls==='sort-book'?['classification','author','digit','suffix'][state.lesson]:null;
+ const bold=text=>{const strong=document.createElement('strong');strong.className='compare-focus';strong.textContent=text;return strong};
+ top.append(focus==='classification'?bold(p.classificationText):p.classificationText);
+ bottom.append(focus==='author'?bold(p.author):p.author);
+ if(focus==='digit')bottom.append(bold(p.number[0]),p.number.slice(1));else bottom.append(p.number);
+ bottom.append(focus==='suffix'?bold(p.suffix):p.suffix);el.append(top,bottom);return el;
+}
 function openSorting(){
  clearInputs();const p=SORT_LESSONS[state.lesson];$('sort-title').textContent=p.title;$('sort-hint').textContent=p.hint;$('sort-progress').textContent=state.lesson+' / '+SORT_LESSONS.length+' 완료';$('sort-feedback').textContent='';state.slot=null;renderSorting();if(!$('sorting').open)$('sorting').showModal();
 }
@@ -102,11 +110,25 @@ function moveAlong(entity,route,dt,speed=1.8){entity.moving=false;if(!route.leng
 function updatePlayer(dt){
  player.moving=false;if(hasModal())return;
  let dx=Number(keys.has('d')||keys.has('ArrowRight'))-Number(keys.has('a')||keys.has('ArrowLeft'))+stick.x,dz=Number(keys.has('s')||keys.has('ArrowDown'))-Number(keys.has('w')||keys.has('ArrowUp'))+stick.z;
- if(dx||dz){path=[];let n=Math.hypot(dx,dz),c=Math.cos(angle),s=Math.sin(angle),speed=state.cart.attached?1.85:2.65;movePlayer((dx*c+dz*s)/n*dt*speed,(-dx*s+dz*c)/n*dt*speed)}
+ if(dx||dz){path=[];pendingInteraction=null;let n=Math.hypot(dx,dz),c=Math.cos(angle),s=Math.sin(angle),speed=state.cart.attached?1.85:2.65;movePlayer((dx*c+dz*s)/n*dt*speed,(-dx*s+dz*c)/n*dt*speed)}
  else if(path.length){const goal=path[0],d=dist(player,goal);if(d<.10)path.shift();else{const step=Math.min(dt*(state.cart.attached?1.85:2.65),d);if(movePlayer((goal.x-player.x)/d*step,(goal.z-player.z)/d*step)<.0001)path=[]}}
  if(keys.has('q'))angle-=dt;if(keys.has('r'))angle+=dt;
+ if(!path.length&&pendingInteraction){const target=pendingInteraction;pendingInteraction=null;if(dist(player,target.obj)<(target.type==='cart'?1.85:1.65))interact(target)}
 }
-function goTo(x,z){path=pathfind(player,{x,z},state.cart.attached?staticColliders():allColliders(),.23,state.cart.attached?{...state.cart.offset,radius:CART_RADIUS}:null);if(!path.length)say('통로의 다른 위치를 눌러주세요.')}
+function goTo(x,z){pendingInteraction=null;path=pathfind(player,{x,z},state.cart.attached?staticColliders():allColliders(),.23,state.cart.attached?{...state.cart.offset,radius:CART_RADIUS}:null);if(!path.length)say('통로의 다른 위치를 눌러주세요.')}
+function approachTarget(target){
+ const reach=target.type==='cart'?1.85:1.65;if(dist(player,target.obj)<reach){interact(target);return}
+ const radius=target.type==='cart'?1.2:.9,startAngle=Math.atan2(player.x-target.obj.x,player.z-target.obj.z),colliders=state.cart.attached?staticColliders():allColliders(),companion=state.cart.attached?{...state.cart.offset,radius:CART_RADIUS}:null;
+ let best=null;for(let i=0;i<16;i++){const turn=i===0?0:Math.ceil(i/2)*(i%2?1:-1)*Math.PI/8,a=startAngle+turn,goal={x:target.obj.x+Math.sin(a)*radius,z:target.obj.z+Math.cos(a)*radius};if(blocked(goal.x,goal.z,colliders,.23))continue;const route=pathfind(player,goal,colliders,.23,companion);if(!route.length||dist(route.at(-1),target.obj)>=reach)continue;let cost=0,from=player;for(const p of route){cost+=dist(from,p);from=p}if(!best||cost<best.cost)best={route,cost};if(i===0&&route.length===1)break}
+ if(!best){say('가까이 갈 수 있는 통로를 먼저 확인해 주세요.');return}path=best.route;pendingInteraction=target;
+}
+function screenTarget(clientX,clientY){
+ const rect=canvas.getBoundingClientRect(),x=clientX-rect.left,y=clientY-rect.top,hits=[];
+ for(const a of actors.filter(n=>!['hidden','served','leaving'].includes(n.status))){const feet=renderer.project(a.x,.03,a.z),head=renderer.project(a.x,a.spriteState?.worldHeight||a.height||1.5,a.z),width=Math.max(17,Math.abs(feet.y-head.y)*.37);if(Math.abs(x-feet.x)<width&&y>head.y-14&&y<feet.y+4)hits.push({type:'npc',obj:a,depth:feet.y})}
+ const c=state.cart,corners=[];for(const dx of [-.64,.64])for(const dz of [-.64,.64])for(const h of [.02,1.24])corners.push(renderer.project(c.x+dx,h,c.z+dz));
+ if(x>=Math.min(...corners.map(p=>p.x))&&x<=Math.max(...corners.map(p=>p.x))&&y>=Math.min(...corners.map(p=>p.y))-16&&y<=Math.max(...corners.map(p=>p.y))+4)hits.push({type:'cart',obj:c,depth:renderer.project(c.x,0,c.z).y});
+ hits.sort((a,b)=>b.depth-a.depth);return hits[0]||null;
+}
 function toggleCart(){if(hasModal())return;if(state.cart.attached){state.cart.attached=false;state.cart.offset=null;path=[];say('북카트를 놓았습니다.');save();updateHUD();return}const distance=dist(player,state.cart);if(distance>1.85||distance<.1){say('북카트 가까이에서 연결해 주세요.');return}const dx=(state.cart.x-player.x)/distance,dz=(state.cart.z-player.z)/distance,handle={x:state.cart.x-dx*PUSH_DISTANCE,z:state.cart.z-dz*PUSH_DISTANCE};for(let i=1;i<=8;i++){const t=i/8;if(blocked(player.x+(handle.x-player.x)*t,player.z+(handle.z-player.z)*t,allColliders(),.23)){say('손잡이 뒤에 설 수 있도록 카트 가까운 빈자리로 와 주세요.');return}}Object.assign(player,handle);player.angle=Math.atan2(dx,dz);state.cart.angle=player.angle;state.cart.attached=true;state.cart.offset={x:dx*PUSH_DISTANCE,z:dz*PUSH_DISTANCE};path=[];say('이제 걸어가면 바로 앞의 북카트를 밀 수 있어요.');save();updateHUD()}
 function pickBooks(){
  if(!state.pile.length)return;const room=HAND_LIMIT-state.hand.length;if(room<=0){say('이미 책 5권을 들고 있어요. 북카트에 담거나 서가에 꽂아주세요.');return}
@@ -232,8 +254,8 @@ function draw(){
  const addBook=(x,y,z,i)=>objects.push({asset:assets.book,matrix:pose(x,y,z,(i%2)*.15)});
  for(let i=0;i<state.pile.length;i++)addBook(layout.bookPile.x+(i-1)*.12,.18,layout.bookPile.z,i);
  for(let i=0;i<state.cart.books.length;i++)addBook(state.cart.x+(i-1)*.12,.88,state.cart.z,i);
- for(let i=0;i<state.hand.length;i++)addBook(player.x+.18+i*.06,.75,player.z+.18,i);
- const visible=actors.filter(a=>a.status!=='hidden');renderer.render(objects,eye,target,z,{warmth:.08,level:.95,phase:.4,sky:[.70,.72,.62]},[{entity:player,asset:assets.librarian,height:1.5},...visible.map(n=>({entity:n,asset:assets[n.appearance],height:n.height||1.5}))]);
+ const heroSprite=state.hand.length>=3?'librarian-carry-stack':state.hand.length?'librarian-carry-one':'librarian';
+ const visible=actors.filter(a=>a.status!=='hidden');renderer.render(objects,eye,target,z,{warmth:.08,level:.95,phase:.4,sky:[.70,.72,.62]},[{entity:player,asset:assets[heroSprite],height:1.5},...visible.map(n=>({entity:n,asset:assets[n.appearance],height:n.height||1.5}))]);
  for(const s of layout.shelves)label('shelf-'+s.code,s.code+' '+CATEGORIES[s.category],s,2.3,(state.phase==='escort'&&s.category===9||['cart','shelve'].includes(state.phase)&&s.category===8)?'target':'');
  for(const n of actors){if(n.status==='hidden'){if(labels.has(n.id))labels.get(n.id).hidden=true;continue}label(n.id,n.name+(n.status==='working'?' · 확인 중…':''),n,(n.spriteState?.worldHeight||n.height||1.5)+.28,n.home?'staff':['waiting','reported'].includes(n.status)?'patron':'')}
  label('player','나 · 자원봉사자',player,(player.spriteState?.worldHeight||1.5)+.27);
@@ -278,14 +300,14 @@ function bindControls(){
  window.addEventListener('keyup',e=>keys.delete(e.key.length===1?e.key.toLowerCase():e.key));window.addEventListener('blur',clearInputs);window.addEventListener('resize',syncDialogueLayout);document.addEventListener('visibilitychange',()=>{clearInputs();last=0;save()});window.addEventListener('beforeunload',save);
  canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('pointerdown',e=>{if(hasModal())return;drag={button:e.button,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture(e.pointerId)});
  canvas.addEventListener('pointermove',e=>{if(drag?.button===2){angle+=(e.clientX-drag.x)*.008;drag.x=e.clientX}});
- canvas.addEventListener('pointerup',e=>{if(drag?.button===0&&!hasModal()&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<7){const p=renderer.ground(e.clientX,e.clientY),targets=[];for(const a of actors.filter(n=>n.status!=='hidden')){const point=renderer.project(a.x,(a.spriteState?.worldHeight||a.height||1.5)*.6,a.z),d=Math.hypot(e.clientX-canvas.getBoundingClientRect().left-point.x,e.clientY-canvas.getBoundingClientRect().top-point.y);if(d<40&&dist(player,a)<1.7)targets.push({type:'npc',obj:a,d,text:a.name})}if(targets.length)interact(targets.sort((a,b)=>a.d-b.d)[0]);else if(nearby&&dist(p,nearby.obj)<.75)interact();else goTo(p.x,p.z)}drag=null});
+ canvas.addEventListener('pointerup',e=>{if(drag?.button===0&&!hasModal()&&Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<7){const target=screenTarget(e.clientX,e.clientY);if(target)approachTarget(target);else{const p=renderer.ground(e.clientX,e.clientY);if(nearby&&dist(p,nearby.obj)<.75)interact();else goTo(p.x,p.z)}}drag=null});
  canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(5.5,Math.min(18,zoom+e.deltaY*.008))},{passive:false});
  const touch=!!navigator.maxTouchPoints||window.matchMedia('(pointer:coarse)').matches;document.body.classList.toggle('touch',touch);if(touch){const resize=()=>{document.body.style.setProperty('--game-height',(window.visualViewport?.height||innerHeight)+'px');clearInputs()};resize();window.addEventListener('resize',resize);window.visualViewport?.addEventListener('resize',resize);const joy=$('joystick');let down=false;const move=e=>{if(!down)return;const r=joy.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dz=e.clientY-r.top-r.height/2,scale=Math.min(1,28/Math.max(1,Math.hypot(dx,dz)));stick={x:dx*scale/28,z:dz*scale/28};$('knob').style.transform='translate('+dx*scale+'px,'+dz*scale+'px)'};joy.addEventListener('pointerdown',e=>{e.preventDefault();down=true;joy.setPointerCapture(e.pointerId);move(e)});joy.addEventListener('pointermove',move);for(const type of ['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(type,()=>{down=false;stick={x:0,z:0};$('knob').style.transform='translate(0,0)'})}
 }
 
 async function init(){try{
- renderer=new Renderer(canvas);const spriteNames=['librarian','mentor','officer','patron','boy-blue'];const [library,cart,book,sprites,data]=await Promise.all([renderer.load('assets/library.glb.gz'),renderer.load('assets/cart.glb.gz'),renderer.load('assets/book.glb.gz'),Promise.all(spriteNames.map(n=>renderer.loadSprite(n))),assetFetch('assets/layout.json').then(r=>r.json())]);assets={library,cart,book,...Object.fromEntries(spriteNames.map((n,i)=>[n,sprites[i]]))};layout=data;freshWorld();bindControls();$('loading').remove();
+ renderer=new Renderer(canvas);const spriteNames=['librarian','librarian-carry-one','librarian-carry-stack','mentor','officer','patron','boy-blue'];const [library,cart,book,sprites,data]=await Promise.all([renderer.load('assets/library.glb.gz'),renderer.load('assets/cart.glb.gz'),renderer.load('assets/book.glb.gz'),Promise.all(spriteNames.map(n=>renderer.loadSprite(n))),assetFetch('assets/layout.json').then(r=>r.json())]);assets={library,cart,book,...Object.fromEntries(spriteNames.map((n,i)=>[n,sprites[i]]))};layout=data;freshWorld();bindControls();$('loading').remove();
  let saved;try{saved=JSON.parse(localStorage.getItem(SAVE_KEY))}catch{}if(saved?.version===1&&saved.state?.record&&saved.actors?.length===4){choices('player','나 · 자원봉사자','이전에 진행하던 봉사 기록이 있어요.',[{label:'이어서 하기',run:()=>{restore(saved);session=true;continueScene()}},{label:'처음부터 새로 시작',run:startIntro}])}else startIntro();
- window.library98Demo={get state(){return state},get player(){return player},get actors(){return actors},get layout(){return layout},get nearby(){return nearby},get renderer(){return renderer},interact,inspectScene,exitPreview,openSorting,selectSlot,confirmSort,toggleCart,movePlayer,goTo,closeAll,startIntro,startDay,advance,draw,teleport:(x,z)=>{player.x=x;player.z=z;path=[];nearby=closest()},snapshot,restore,workClock,recordMistake};requestAnimationFrame(tick);
+ window.library98Demo={get state(){return state},get player(){return player},get actors(){return actors},get layout(){return layout},get nearby(){return nearby},get renderer(){return renderer},get route(){return path},interact,approachTarget,inspectScene,exitPreview,openSorting,selectSlot,confirmSort,toggleCart,movePlayer,goTo,closeAll,startIntro,startDay,advance,draw,teleport:(x,z)=>{player.x=x;player.z=z;path=[];pendingInteraction=null;nearby=closest()},snapshot,restore,workClock,recordMistake};requestAnimationFrame(tick);
  }catch(error){console.error(error);$('loading-message').textContent='불러오지 못했습니다: '+error.message}}
 init();

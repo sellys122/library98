@@ -30,17 +30,15 @@ for obj in environment:
  obj.location=Vector((new['x'],-new['z'],0))+rotation@(obj.location-Vector((old['x'],-old['z'],0)))
  obj.rotation_euler.rotate_axis('Z',new['angle'])
 layout['shelves']=new_shelves
-layout['revision']=2
+layout['revision']=3
 for collider in layout['colliders']:
  if collider['id'].startswith('shelf-'):
   shelf=next(s for s in new_shelves if 'shelf-'+s['code']==collider['id'])
   collider.update({k:shelf[k] for k in ['x','z','w','d']})
-# Face the monitor and keyboard toward the staff side of the counter.
-desk_pivot=Vector((-6.05,-layout['desk']['z'],0));desk_rotation=Matrix.Rotation(math.pi,3,'Z')
+# The working side faces the foreground: staff show their backs to the default camera.
 for obj in environment:
  if obj.name.startswith(('ENV_monitor_','ENV_keyboard')):
-  obj.location=desk_pivot+desk_rotation@(obj.location-desk_pivot)
-  obj.rotation_euler.rotate_axis('Z',math.pi)
+  obj.location.y-=.30
 
 def export(name,objects,offset=(0,0,0)):
  copies=[]
@@ -71,8 +69,8 @@ export('book',[book],tuple(book.location))
 layout['cart']={'x':2.3,'z':3.5}
 layout['spawn']={'x':-2.1,'z':4.1}
 layout['bookPile']={'x':.9,'z':3.4}
-layout['mentor']={'x':-6.05,'z':3.2,'angle':0}
-layout['officer']={'x':-4.75,'z':3.2,'angle':0}
+layout['mentor']={'x':-6.05,'z':5.45,'angle':math.pi}
+layout['officer']={'x':-4.75,'z':5.45,'angle':math.pi}
 for i,(x,z,w,d) in enumerate([(-7.4,5.6,.45,.45),(7.7,-5.3,.45,.45),(7.7,5.5,.45,.45),(-6.7,-5.6,.5,.5),(-6.7,-4.4,.5,.5)]):
  layout['colliders'].append({'id':'fixture-'+str(i),'x':x,'z':z,'w':w,'d':d})
 (root/'assets/layout.json').write_text(json.dumps(layout,ensure_ascii=False,indent=2))

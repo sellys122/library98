@@ -9,7 +9,8 @@ for p in (r/'assets').iterdir():
 html=(r/'index.html').read_text()
 css=(r/'style.css').read_text().replace('assets/dialogue-portraits.png','data:image/png;base64,'+embedded.pop('assets/dialogue-portraits.png'))
 js='\n'.join(re.sub(r'^import .*?;\n','',(r/name).read_text(),flags=re.M).replace('export ','') for name in ['engine.js','navigation.js','rules.js','story.js','game.js'])
-html=html.replace('<link rel="stylesheet" href="style.css">','<style>'+css+'</style>').replace('<script type="module" src="game.js"></script>','<script>window.LIBRARY_EMBEDDED='+json.dumps(embedded)+';</script><script>'+js+'</script>')
+html=re.sub(r'<link rel="stylesheet" href="style\.css(?:\?[^\"]*)?">',lambda _: '<style>'+css+'</style>',html)
+html=re.sub(r'<script type="module" src="game\.js(?:\?[^\"]*)?"></script>',lambda _: '<script>window.LIBRARY_EMBEDDED='+json.dumps(embedded)+';</script><script>'+js+'</script>',html)
 (r/'play.html').write_text(html)
 (r.parent/'library98-volunteer-demo.html').write_text(html)
 with zipfile.ZipFile(r.parent/'library98-volunteer-demo.zip','w',zipfile.ZIP_DEFLATED) as archive:
